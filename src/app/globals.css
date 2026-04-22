@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --forest: #2b4231;
+  --linen: #e5e0d4;
+  --walnut: #6c5138;
+  --cream: #e7e0d5;
+  --midnight: #1e3249;
+  --blush: #ead3c5;
+  --ink: #1a1a1a;
+  --paper: #f4efe5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-inter-tight), system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--forest);
+  color: var(--paper);
+}
+
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-feature-settings: 'ss01';
+}
+
+.font-mono {
+  font-family: var(--font-jetbrains), monospace;
+}
+
+/* Grain overlay */
+.grain {
+  position: relative;
+}
+.grain::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.035;
+  z-index: 100;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Reveal animation */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  animation: fade-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fade-in 1.2s ease-out both;
+}
+
+/* Input styles */
+.t-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--walnut);
+  padding: 0.5rem 0;
+  font-size: 1.125rem;
+  color: var(--ink);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+.t-input:focus {
+  border-bottom-color: var(--forest);
+}
+.t-input::placeholder {
+  color: rgba(26, 26, 26, 0.35);
+}
+
+.t-label {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--walnut);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.t-button {
+  background: var(--forest);
+  color: var(--paper);
+  padding: 1rem 2rem;
+  border: none;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.t-button:hover:not(:disabled) {
+  background: var(--midnight);
+  transform: translateY(-1px);
+}
+.t-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.t-button-ghost {
+  background: transparent;
+  color: var(--forest);
+  border: 1px solid var(--walnut);
+  padding: 1rem 2rem;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.t-button-ghost:hover {
+  background: var(--forest);
+  color: var(--paper);
+  border-color: var(--forest);
+}
+
+/* Rule line */
+.rule {
+  height: 1px;
+  background: var(--walnut);
+  opacity: 0.3;
+}
+
+/* Checkbox / radio custom */
+.t-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(108, 81, 56, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  font-size: 0.95rem;
+  color: var(--ink);
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+.t-check:hover {
+  border-color: var(--forest);
+  background: rgba(43, 66, 49, 0.03);
+}
+.t-check.selected {
+  border-color: var(--forest);
+  background: rgba(43, 66, 49, 0.06);
+}
+.t-check-box {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--walnut);
+  margin-top: 4px;
+  position: relative;
+  transition: all 0.2s;
+}
+.t-check.selected .t-check-box {
+  background: var(--forest);
+  border-color: var(--forest);
+}
+.t-check.selected .t-check-box::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 3px;
+  height: 6px;
+  border: solid var(--paper);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* Loading dots */
+@keyframes pulse-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+.pulse-dot {
+  animation: pulse-dot 1.4s infinite ease-in-out;
+}
+
+/* Spinning constellation */
+@keyframes rotate-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.rotate-slow {
+  animation: rotate-slow 40s linear infinite;
+}
