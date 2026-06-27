@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import emailjs from '@emailjs/browser';
 
 interface QuizData {
   name: string;
@@ -55,6 +56,10 @@ const LOADING_PHRASES = [
   'Writing your read',
 ];
 
+const EMAILJS_PUBLIC_KEY = 'MJt_zDIq8FCr544zR';
+const EMAILJS_SERVICE_ID = 'service_doffj8i';
+const EMAILJS_TEMPLATE_ID = 'template_2cgj2kz';
+
 export default function ResultPage() {
   const router = useRouter();
   const [data, setData] = useState<QuizData | null>(null);
@@ -62,6 +67,17 @@ export default function ResultPage() {
   const [read, setRead] = useState<Read | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingPhrase, setLoadingPhrase] = useState(0);
+
+  // Email gate state
+  const [showEmailGate, setShowEmailGate] = useState(false);
+  const [email, setEmail] = useState('');
+  const [emailSubmitting, setEmailSubmitting] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+
+  useEffect(() => {
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+  }, []);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('tyche-quiz-data');
@@ -82,9 +98,15 @@ export default function ResultPage() {
     return () => clearInterval(interval);
   }, [read]);
 
+  // Once chart + read are ready, show the email gate instead of results
+  useEffect(() => {
+    if (chart && read && !emailSubmitted) {
+      setShowEmailGate(true);
+    }
+  }, [chart, read]);
+
   const runPipeline = async (d: QuizData) => {
     try {
-      // Step 1: calculate chart
       const chartRes = await fetch('/api/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,7 +122,6 @@ export default function ResultPage() {
       const chartJson = await chartRes.json();
       setChart(chartJson.chart);
 
-      // Step 2: generate read
       const readRes = await fetch('/api/read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,6 +143,43 @@ export default function ResultPage() {
     }
   };
 
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) {
+      setEmailError('A valid email is required to receive your read.');
+      return;
+    }
+
+    setEmailSubmitting(true);
+    setEmailError('');
+
+    try {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+        to_email: 'veronica@tychetouch.com',
+        from_name: data?.name || 'Unknown',
+        from_email: email,
+        hd_type: chart?.type || '',
+        hd_authority: chart?.authority || '',
+        hd_profile: chart?.profile || '',
+        sun_sign: chart ? `${chart.sun.sign} ${Math.floor(chart.sun.degree)}°` : '',
+        birth_location: data?.location?.display || '',
+        offer: data?.offer?.whatYouSell || '',
+        budget: data?.goals?.budget || '',
+        financial_goal: data?.goals?.financialGoal || '',
+      });
+
+      setEmailSubmitted(true);
+      setShowEmailGate(false);
+    } catch (err) {
+      // Still let them through if EmailJS fails — don't block the read
+      console.error('EmailJS error:', err);
+      setEmailSubmitted(true);
+      setShowEmailGate(false);
+    } finally {
+      setEmailSubmitting(false);
+    }
+  };
+
   if (error) {
     return (
       <main className="grain min-h-screen flex items-center justify-center px-8" style={{ background: 'var(--paper)' }}>
@@ -140,6 +198,79 @@ export default function ResultPage() {
 
   if (!chart || !read) {
     return <LoadingState phrase={LOADING_PHRASES[loadingPhrase]} chart={chart} />;
+  }
+
+  // Email gate — appears after loading, before results
+  if (showEmailGate && !emailSubmitted) {
+    return (
+      <main className="grain min-h-screen flex items-center justify-center px-8" style={{ background: 'var(--paper)' }}>
+        <div className="max-w-lg w-full">
+
+          {/* Chart preview — gives them a taste */}
+          <div
+            className="grid grid-cols-2 gap-4 p-6 mb-10"
+            style={{ background: 'var(--linen)', border: '1px solid rgba(108, 81, 56, 0.2)' }}
+          >
+            <ChartStat label="Type" value={chart.type} />
+            <ChartStat label="Authority" value={chart.authority} />
+            <ChartStat label="Profile" value={chart.profile} />
+            <ChartStat label="Sun" value={`${chart.sun.sign} ${Math.floor(chart.sun.degree)}°`} sub={`Gate ${chart.sun.gate}.${chart.sun.line}`} />
+          </div>
+
+          <div className="font-mono text-[10px] tracking-[0.3em] uppercase mb-4" style={{ color: 'var(--walnut)' }}>
+            Your read is ready, {data?.name}
+          </div>
+
+          <h2 className="font-display text-4xl leading-[1.1] font-light mb-4" style={{ color: 'var(--forest)' }}>
+            Where should we send<br />
+            <em>your diagnostic?</em>
+          </h2>
+
+          <p className="text-base leading-relaxed mb-8 opacity-70" style={{ color: 'var(--ink)' }}>
+            Drop your email and your read unlocks immediately. No sequence. No spam. Just the occasional signal from Tyche when it's worth your attention.
+          </p>
+
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-5 py-4 font-mono text-[13px] tracking-[0.05em] outline-none transition-all"
+                style={{
+                  background: 'var(--paper)',
+                  border: '1px solid rgba(108, 81, 56, 0.35)',
+                  color: 'var(--ink)',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--forest)')}
+                onBlur={(e) => (e.target.style.borderColor = 'rgba(108, 81, 56, 0.35)')}
+                disabled={emailSubmitting}
+                autoFocus
+              />
+              {emailError && (
+                <p className="mt-2 font-mono text-[10px] tracking-[0.15em] uppercase" style={{ color: '#c4500a' }}>
+                  {emailError}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={emailSubmitting}
+              className="w-full px-8 py-4 font-mono text-[11px] tracking-[0.2em] uppercase transition-all hover:-translate-y-0.5 disabled:opacity-60 disabled:translate-y-0"
+              style={{ background: 'var(--forest)', color: 'var(--paper)' }}
+            >
+              {emailSubmitting ? 'One moment...' : 'Unlock my read →'}
+            </button>
+          </form>
+
+          <p className="mt-5 font-mono text-[9px] tracking-[0.2em] uppercase opacity-40 text-center" style={{ color: 'var(--ink)' }}>
+            Tyche Digital Agency · tychedigitalagency.com
+          </p>
+        </div>
+      </main>
+    );
   }
 
   const cta = routeCTA(data!.goals.budget, read);
@@ -176,36 +307,10 @@ export default function ResultPage() {
         </h1>
       </section>
 
-      {/* Sections */}
-      <Section
-        number="01"
-        title="Your Design, Read Strategically"
-        body={read.the_design_read}
-        delay="0.3s"
-      />
-
-      <Section
-        number="02"
-        title="Why Your Marketing Feels Off"
-        body={read.why_marketing_feels_off}
-        delay="0.1s"
-        dark
-      />
-
-      <Section
-        number="03"
-        title="What Your Design Actually Wants"
-        body={read.what_your_design_wants}
-        delay="0.1s"
-      />
-
-      <Section
-        number="04"
-        title="Your 90-Day Orientation"
-        body={read.ninety_day_orientation}
-        delay="0.1s"
-        accent
-      />
+      <Section number="01" title="Your Design, Read Strategically" body={read.the_design_read} delay="0.3s" />
+      <Section number="02" title="Why Your Marketing Feels Off" body={read.why_marketing_feels_off} delay="0.1s" dark />
+      <Section number="03" title="What Your Design Actually Wants" body={read.what_your_design_wants} delay="0.1s" />
+      <Section number="04" title="Your 90-Day Orientation" body={read.ninety_day_orientation} delay="0.1s" accent />
 
       {/* CTA */}
       <section className="max-w-[1200px] mx-auto px-8 lg:px-16 py-24">
@@ -268,20 +373,8 @@ function ChartStat({ label, value, sub }: { label: string; value: string; sub?: 
   );
 }
 
-function Section({
-  number,
-  title,
-  body,
-  delay,
-  dark,
-  accent,
-}: {
-  number: string;
-  title: string;
-  body: string;
-  delay: string;
-  dark?: boolean;
-  accent?: boolean;
+function Section({ number, title, body, delay, dark, accent }: {
+  number: string; title: string; body: string; delay: string; dark?: boolean; accent?: boolean;
 }) {
   const background = dark ? 'var(--midnight)' : accent ? 'var(--linen)' : 'transparent';
   const color = dark ? 'var(--paper)' : 'var(--ink)';
@@ -295,9 +388,7 @@ function Section({
           <div className="grid lg:grid-cols-12 gap-8">
             <div className="lg:col-span-4">
               <div className="flex items-baseline gap-4 mb-6">
-                <span className="font-display italic text-5xl font-light" style={{ color: accentColor }}>
-                  {number}
-                </span>
+                <span className="font-display italic text-5xl font-light" style={{ color: accentColor }}>{number}</span>
                 <span className="h-px flex-1 opacity-30" style={{ background: accentColor }} />
               </div>
               <h3 className="font-display text-3xl lg:text-4xl leading-[1.1] font-light" style={{ color: accentColor }}>
@@ -328,29 +419,20 @@ function LoadingState({ phrase, chart }: { phrase: string; chart: Chart | null }
             {Array.from({ length: 12 }).map((_, i) => {
               const angle = (i * 30 * Math.PI) / 180;
               return (
-                <circle
-                  key={i}
-                  cx={50 + 46 * Math.cos(angle)}
-                  cy={50 + 46 * Math.sin(angle)}
-                  r="1"
-                  fill="var(--forest)"
-                />
+                <circle key={i} cx={50 + 46 * Math.cos(angle)} cy={50 + 46 * Math.sin(angle)} r="1" fill="var(--forest)" />
               );
             })}
           </svg>
         </div>
-
         <div className="font-mono text-[10px] tracking-[0.3em] uppercase mb-6" style={{ color: 'var(--walnut)' }}>
           {chart ? 'Phase Two' : 'Phase One'}
         </div>
-
         <h2 className="font-display text-3xl lg:text-4xl leading-[1.2] font-light mb-10">
           {phrase}
           <span className="pulse-dot" style={{ animationDelay: '0s' }}>.</span>
           <span className="pulse-dot" style={{ animationDelay: '0.2s' }}>.</span>
           <span className="pulse-dot" style={{ animationDelay: '0.4s' }}>.</span>
         </h2>
-
         <div className="font-mono text-[10px] tracking-[0.25em] uppercase opacity-50">
           This takes about 30 seconds
         </div>
@@ -360,44 +442,10 @@ function LoadingState({ phrase, chart }: { phrase: string; chart: Chart | null }
 }
 
 function routeCTA(budget: string, read: Read): { url: string; label: string; note: string } {
-  if (budget === '0') {
-    return {
-      url: 'https://ai.tychedigitalagency.com',
-      label: 'Open the Diagnostic Partner',
-      note: 'Free AI chat tool. Takes your read further.',
-    };
-  }
-  if (budget === '500') {
-    return {
-      url: 'https://veronicadietz.com/direction-session',
-      label: 'Book a Direction Session',
-      note: '60 minutes with Veronica. $500. A read on your load-bearing issue.',
-    };
-  }
-  if (budget === '1000') {
-    return {
-      url: 'https://tychedigitalagency.com/marketing-support',
-      label: 'Explore Tyche Marketing Support',
-      note: 'Ongoing marketing that fits your capacity. $1,000+/mo.',
-    };
-  }
-  if (budget === '2500') {
-    return {
-      url: 'https://tychedigitalagency.com/foundational-build',
-      label: 'Explore a Foundational Build',
-      note: 'The GHL infrastructure your marketing needs. $2,500+.',
-    };
-  }
-  if (budget === '5000') {
-    return {
-      url: 'https://veronicadietz.com/the-residency',
-      label: 'Explore The Residency',
-      note: 'Strategic partnership at scale. $10k virtual, $20k in-person.',
-    };
-  }
-  return {
-    url: 'https://ai.tychedigitalagency.com',
-    label: 'Open the Diagnostic Partner',
-    note: 'Start with the free read.',
-  };
+  if (budget === '0') return { url: 'https://ai.tychedigitalagency.com', label: 'Open the Diagnostic Partner', note: 'Free AI chat tool. Takes your read further.' };
+  if (budget === '500') return { url: 'https://veronicadietz.com/direction-session', label: 'Book a Direction Session', note: '60 minutes with Veronica. $500. A read on your load-bearing issue.' };
+  if (budget === '1000') return { url: 'https://tychedigitalagency.com/marketing-support', label: 'Explore Tyche Marketing Support', note: 'Ongoing marketing that fits your capacity. $1,000+/mo.' };
+  if (budget === '2500') return { url: 'https://tychedigitalagency.com/foundational-build', label: 'Explore a Foundational Build', note: 'The GHL infrastructure your marketing needs. $2,500+.' };
+  if (budget === '5000') return { url: 'https://veronicadietz.com/the-residency', label: 'Explore The Residency', note: 'Strategic partnership at scale. $10k virtual, $20k in-person.' };
+  return { url: 'https://ai.tychedigitalagency.com', label: 'Open the Diagnostic Partner', note: 'Start with the free read.' };
 }
